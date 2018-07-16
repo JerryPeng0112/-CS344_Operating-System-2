@@ -1,0 +1,161 @@
+\documentclass[10pt,a4paper]{article}
+
+%% Language and font encodings
+\usepackage[english]{babel}
+\usepackage[utf8x]{inputenc}
+\usepackage[T1]{fontenc}
+
+%% Sets page size and margins
+\usepackage[a4paper,top=3cm,bottom=2cm,left=3cm,right=3cm,marginparwidth=1.75cm]{geometry}
+
+%% Useful packages
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage[colorlinks=true, allcolors=blue]{hyperref}
+
+\def \CourseName{Operating Systems II}
+\def \AssignmentTitle{Final Paper}
+\def \Author{Tsewei Peng}
+\def \Term{Spring 2018}
+
+\begin{document}
+\begin{titlepage}
+    \vspace*{120px}
+    \begin{center}
+    {\huge \textbf{\AssignmentTitle}}\par
+    \vspace{400px}
+    {\Huge \CourseName}\par
+    \vspace{10px}
+    {\large\Term}\par
+    \vspace{10px}
+    \Large \Author
+    \end{center}
+    \vspace*{\fill}
+\end{titlepage}
+
+
+
+\section{Introduction}
+This final report covers some of the fundamental operating system concepts. In this report, similarities and differences between Windows, FreeBSD, and Linux is discussed. Each of these systems are well-engineered and widely-used, so thorough understanding would be very useful. The 3 core concepts selected to be discussed in this report, are list as the following: 1) Processes, Threads, Scheduling 2) I/O and provided functionality 3) Memory Management
+
+\section{Processes, Threads, and Scheduling}
+
+\subsection{Processes}
+\subsubsection{Windows}
+In Windows, processes are defined as programs in executions. The data structure representing Windows processes is called executive process, or EPROCESS, which contains data structures and points to other related data structures. The EPROCESS block and its related data structures resides in system address space with exception to PEB, the process environment block. This means most of the information inside the EPROCESS block and its data structures are accessible only in kernel-mode. Most of the process creations happen in kernel-mode. [1]
+
+The other data structures that are relevant to process inside Windows kernel are the kernel process block (KPROCESS), process environment block (PEB), and Windows subsystem process (Csrss). The PEB, pointed to by EPROCESS, resides in process address space because it contains information that is accessible by user-mode code. Windows subsystem process maintains a parallel structure for each process that is executing, and the kernel-mode part of the subsystem also maintains a parallel data structure when a thread calls Windows USER or GDI function in kernel mode. A process is created when calling function CreateProcess. [1]
+
+\subsubsection{FreeBSD}
+In FreeBSD, each program running at any given time is called a process. Each process is uniquely identified by a number called a process ID, or PID. During initialization, the kernel assign process a virtual address space, mapping to its object code and global variables, as well as kernel resources such as process credentials, signal state and descriptor arrays for I/O operations. Some of the information is saved inside a structure called task\_structEach process is started by a parent process with exception of a special process called init, which is started during boot time and has a PID of 1. A running process’s data structure contains 2 PIDs, one for itself and one for its parent process, as well as signal state, process tracing information and timers. Also, processes have 3 states: NEW, NORMAL, ZOMBIE, and processes in ZOMBIE states are put into zombproc list, while other processes are put into allproc list. This helps reduce the time spent by wait system call, schedulers and other functions that scans for runnable processes. Each process also has one owner and group, which helps determine whether files can be opened by the process. The process of process creation is discussed below in Linux section, since the steps are very similar between FreeBSD and Linux. [3]
+
+\subsubsection{Linux}
+In Linux, the definition of process is very similar to those of Windows and FreeBSD. Processes in all three operating systems reside in memory address space with their own data structures. Also, user mode and kernel mode is another functionality supported by all three systems. In terms of process creation, Linux is very similar to FreeBSD, but differs greatly from Windows; in Linux/FreeBSD, a process is created by first calling fork() in the parent process to duplicate itself as a new child process, and then calling exec() call to load executable into child process’s address space and execute it. While Windows creates process by calling CreateProcess function, which creates a new EPROCESS block with its allocated resources, loads executables into its address space, and execute the executable. Another difference between Linux/FreeBSD and Windows is in process termination. In Linux/FreeBSD, if a parent process terminates, all of its child processes are to be terminated. However, in Windows, if a parent process is terminated, child processes are not destroyed. These differences can be explained by the philosophy behind each systems. Linux/FreeBSD’s is designed to have modularity, as Unix philosophy states: “Do one thing and do it well”, which explains why it takes 2 functions calls to create a new process. On the other hand, Windows puts the process creation steps into CreateProcess function, as Windows does not see the benefit of modularizing the creation process. Between Linux and FreeBSD, there are some small differences in the way process state is labeled. In Linux, the state of a process is represented by these 5 flags: TASK\_RUNNING, TASK\_INTERRUPTIBLE, TASK\_UNINTERRUPTIBLE, \_TASK\_TRACED, \_TASK\_STOPPED. Which are available in kernel space. [4]
+
+\subsection{Threads}
+\subsubsection{Windows}
+In Windows, a thread is represented by an executive thread object, which encapsulates an ETHREAD structure. ETHREAD also contains KTHREAD structure as its first member. The ETHREAD structure and structures it points to reside in the system address space, with the exception of thread environment block (TEB). TEB exists in the process address space because some information needs to be accessible in user-mode. TEB stores context information for image loader and various Windows dynamically linked libraries. Similar to processes, Windows subsystem process (Csrss) holds a parallel structure for each thread. If the thread called a windows subsystem USER or GDI function, kernel-mode part of the subsystem also holds a parallel data structure that KTHREAD points to. The thread creation function inside Windows is called CreateThread, analogous to CreateProcess for processes. In addition, threads have 7 states: Ready, Deferred ready, Standby, Running, Waiting, Transition, Terminted, Initialized. These states are used for context switching within the system. [1]
+
+\subsubsection{FreeBSD}
+In FreeBSD, threads of a process operate in either user mode or kernel mode. In user mode, a thread operates in a nonprivileged protection mode; when a thread makes a system call, the thread switches to kernel mode. Resource used by each thread are split into two parts, one for user-mode and one for kernel mode. The kernel mode resource includes kernel state, the state required for kernel to provide system services. The kernel state includes information about the thread’s and the process it is spawned from, which are represented by some data structures. Two primary data structures among those are the process structure and the thread structure. The process structure, along with other structures that it’s pointing to, must always reside in main memory. Thread structure, however, needs to be in main memory only when the process is executing. Both structures are allocated dynamically as during process creation, and freed when the process is destroyed. [3]
+
+\subsubsection{Linux}
+In Linux, all threads are implemented as standard processes. There are no special scheduling mechanism or data structures to represent threads, since thread is merely a process that shares certain resources with other processes. Each thread has a unique task\_struct. This contrasts greatly from both FreeBSD and Windows in that both of these systems have a kernel support for a special thread creation process, while Linux treat threads like processes with shared resources. This is shown with thread creation in Linux in code; new thread is created via clone() system call with passed flags to specify which resources are to be shared. It is important to note that clone() system call is the underlying function for the implementation of fork() system call. Linux does share some resemblance between FreeBSD, in that they allow creation of threads in user-space, while all of the thread creation is handled inside the kernel. [4]
+
+
+\subsection{Scheduling}
+\subsubsection{Windows}
+Windows’ scheduling system is priority-driven, preemptive, and it is run on thread level. At any given time, at least one of the highest-priority threads that are runnable always runs. When a thread is allowed to run, it runs for a quantum, which is the length of time a thread is allowed to run before another thread with the same priority level is given a turn to run. Note that quantum can vary from system to system and process to process. If another thread with a higher priority becomes ready to run, current running thread is stopped to run the higher priority thread. All of the information is tracked inside the dispatcher database, which makes the thread-scheduling decisions. To adjust priority, the Windows scheduler adjusts the priority of threads periodically using an internal priority-boosting mechanism, this not only acts as a method to prevent starvation, in many cases, the mechanism decreases latencies. In a nutshell, when a thread is popped off a dispatcher, its state is set to Running. Once it runs for a quantum, it is then put back into the queue, which makes this scheduling system very intuitive. [1]
+
+\subsubsection{FreeBSD}
+The default scheduler in FreeBSD is called the FreeBSD timeshare scheduler, which uses a priority-based scheduling policy that is biased to favor interactive programs. The scheduler first assigns a high priority to each thread and allow one thread to execute for a fixed amount of time. After that, the thread who just ran has their priority lowered by the scheduler, while those who gave up the CPU maintains their priority level. The scheduler also has special mechanism to deal with tasks such as compilation of a large program, or thrashing, a phenomenon that happens when memory is so short-supplied that more time is spent on handling page fault than doing the computation. [3]
+
+\subsubsection{Linux}
+In Linux, there are multiple schedulers introduced throughout development of Linux. The default scheduler in kernel version 2.6.23 is the Completely Fair Scheduler, or CFS. Implied by its name, the CFS is designed to make sure every process gets their fair share of CPU time. This scheduler takes into account priority levels of each processes, such as “interactivity score” and “nice score”. The interactivity score is the rating of interactivity of a program, which works similar as the scheduler of FreeBSD; when a process is interactive, such as a text editor, it gets a boost in priority. Another score is the nice score, the nice score indicates how “nice” a process is. The higher the nice score, the more likely the process is willing to give up CPU time. [4]
+
+The similarity between the schedulers across 3 operating systems is that they are preemptive, meaning a highest priority process is always allowed to run. The similarities of scheduling policy between FreeBSD and Linux is very apparent, while Windows has a completely different software data structures and algorithms for process scheduling. Other than the underlying implementations of the scheduling, Windows and Linux differs in the number of states. In Linux, there are 5 states for each process, while in Windows, there are 7 states. These states are controlled by the scheduler and are useful for context switching. The states are listed in the sections above. [4]
+
+\section{I/O and Provided Functionality}
+\subsection{Windows}
+Windows uses the I/O Manager as a framework to handle I/O requests and device drivers. The I/O Manager is packet driven; most I/O requests are represented by I/O request packet (IRP). Upon I/O requests, the I/O Manager creates a IRP in the memory, and pass the pointer to that IRP to the correct driver. Once the I/O operation is finished, the allocated IRP is freed. The I/O manager also supplies code for drivers to call for I/O Processing, which is a great since it makes individual drivers simpler. In addition, the I/O manager provide service for subsystems to implement their own I/O functions. [2]
+
+When I/O Managers maps IRP to device drivers, it must determine which type of device drivers the IRP is trying to interact with. There are many types of drivers. Drivers that follows the Windows Driver Model are called WDM drivers. They are compatible to all Windows operating system. According to the text, there are 3 types of WDM drivers: bus drivers, function drivers, and filter drivers. Bus drivers manage a logical or physical bus, and it informs the PnP (plug and play) manager when devices are attached to the bus it controls. The function drivers manage a particular type of device, such as mouse or headsets. In general, the function drivers knows most about the operation of the device. Filter drivers are layers either above or below function drivers (function filters), or above the bus drivers (bus filters). These drivers usually change the behavior of a device or another driver. [2]
+
+In Windows, device drivers include a set of routines that are called during the process of I/O request. The following 6 routines are the core routines of any I/O drivers:  an initialization routine, an add-device routine, a set of dispatch routines, a start I/O routine, an interrupt service routine and an interrupt-servicing DPC routine. The initialization routine loads the driver into the operating system. The add-device routine is a routine that must be implemented to support Plug and Play; this routine is called by the PnP manager. The dispatch routines are the entry points that the device driver provides; this routine is called by the I/O manager when it determines the device driver is to be used for I/O requests. The interrupt service routine is used for device interrupts, and it is called when a device interrupts during I/O operations. After the interrupt service routine call, interrupt-servicing DPC routine is called to handle most of the device interrupt. There are many more routines that are common among most of the drivers, which will not be discussed in this report. [2]
+
+In terms of I/O, there are 4 types of I/O operations in Windows: synchronous and asynchronous I/O, fast I/O, mapped file I/O, and scatter/gather I/O. Synchronous I/O is the default I/O, which blocks the calling application until the I/O operation is complete. The most common example of synchronous I/O is the ReadFile and WriteFile function. On the other hand, Asynchronous I/O allows application to execute during I/O operations. It also allows application to request multiple I/O requests. Fast I/O is true to its name; it provides a faster I/O operation by bypassing the IRP generation and go directly to the driver stack to complete I/O requests. Mapped file I/O refers to “the ability to view a file residing on disk as part of a process’s virtual memory”, and it is available in user mode. Lastly, scatter/gather I/O is a highly-performant I/O that allows application to issue one single I/O request for more than one buffer in the memory to a continuous part of a disk. [2]
+
+\subsection{FreeBSD}
+In terms of device driver management, FreeBSD uses Common Access Method (CAM). It is a method for separating host bus adapter (HBA) drivers from storage drivers. CAM not only reduces the complexity of individual drivers, but also modularizes the HBO and storage drivers. CAM has 3 layers for processing I/O requests. The first layer is the CAM Peripheral Module Layer, and it is responsible for providing open, close, strategy, attach, and detach operations for supported devise. Upon I/O request, each responsible peripheral driver build I/O command for its driver and passes the command to transport layer for execution. This layer also recovers the errors during I/O operations. The CAM Transport (XPT) schedules and dispatches I/O commands, acting as a switch that directs each command to the HBA it belongs to. The CAM software interface module, or HBA interface layer, provides bus routing to devices. It is responsible for allocating a path to the requested device, sending the command that is passed from CAM peripheral layer to the device, collect notification of I/O completion from device, as well as identifying errors and notifying the other 2 CAM layers for error recovery. [3]
+
+In FreeBSD, device drivers should follow a specific structure. The structure should have 3 sections: autoconfiguration and initialization routine, I/O servicing requests routines, and interrupt service routines. Autoconfiguration is the portion of the driver that checks whether the hardware connected is ready for communications or interactions. The actual I/O servicing routines are called by the I/O scheduler when the command created in CAM layer is dispatched. And lastly, the interrupt service routines are interfaced when there is an interrupt. [3]
+
+In terms of accessing storage devices, FreeBSD detects dynamically when the devices connect, and place their nodes on to DEVFS filesystem mounted on /dev directory.
+
+\subsection{Linux}
+In Linux, I/O scheduling for block device is very intuitive. It is different from FreeBSD/Windows in that Linux has multiple I/O scheduler that works by managing a device’s request queue and dispatching it periodically. Because the scheduler directly interfaces with the device driver, the kernel requires associated control information that accompanies the data, so the I/O system is designed to have a descriptor for each buffer. The descriptor is called buffer\_head and is of type struct buffer\_head. However, the struct causes some needless overhead, so the Linux 2.5 kernel introduces a bio data structure. The bio data structure allows buffers to be in chunks and not constiguous. With the new data structure design and specifications, a lot of overheads and computational spaces are reduced. [4]
+
+Linux includes multiple built-in I/O schedulers. They are listed as the following: the Linus elevator, the deadline I/O scheduler, the anticipatory I/O scheduler, the complete fair queuing I/O scheduler, and the Noop I/O scheduler.
+
+The Linus elevator performs merging and sorting new requests. However, the scheduling algorithm is not very efficient, especially when there are a burst of I/O requests. What’s worse is that the algorithm causes severe starvation.
+
+The deadline I/O scheduler aims to fix just that. The deadline algorithm merges and sorts requests, but afterwards, the requests are added to one of the three types of queues depending the type of requests. The 3 types of queues are: read FIFO queue, write FIFO queue, and sorted queue. The dispatched queue is the combination of 3 types of queue.
+
+The anticipatory I/O scheduler is built on deadline scheduler. It aims to profide excellent read latency and global throughput.
+
+Completely Fair Queuing I/O Scheduler creates one small queue per process of sorted I/O requests queues. This scheduler has very good performance, so it is the default I/O scheduler in Linux.
+
+Noop I/O scheduler does not perform any sorting or any seek-prevention, but it performs some merging. This scheduler is meant for devices that are truly random-access.
+
+The differences between Windows and Linux/FreeBSD is huge in terms of I/O systems. Windows prefers more centralized design where there is a manager from initializing device driver, to dispatching I/O requests. In contrast, FreeBSD does not have centralized scheduler, and uses CAM for transporting I/O requests to the device drivers. Linux has a more centralized, yet simple design approaching the problem; Linux creates a system where device drivers need to fit with scheduler specifications so that all drivers have the same standards, and users can modularize and customize their Linux operating system with built-in I/O schedulers, or even custom I/O schedulers! In terms of accessing block device, FreeBSD and Linux are extremely similar in terms of the nodes creation under /dev directory for both.
+
+\section{Memory Management}
+\subsection{Windows}
+In Windows, the maximum amount of physical memory supported by Windows ranges from 2GB to 2048GB. To manage such amount of memory, Windows uses Memory Manager to manage the virtual memory space. The main tasks of Memory Manager is to first map a process’s virtual address into physical memory, and second, page some contents of memory to disk when system tries to use more physical memory than what is currently available. [2]
+
+The operating system also keeps small data structures called page tables and virtual address descriptors. These data structure are used to represent the state of process address space. [2]
+
+The virtual address descriptors (VAD) is a data structure maintained by the Memory Manager to keep track of whether virtual addresses have been reserved in process’s address space. VAD are allocated in nonpaged pool. The VAD is implemented as a tree structures within Windows, where each node can be marked as committed, free, or reserved. Note that node marked as committed means the memory is under use. Each process can request up to 4GB of memory via paging. The first half of 2GB memory are reserved for kernel mode, while the other half of 2GB memory are reserved for user mode. [2]
+
+Note that since page fault significantly delay the time to fetch data into memory, there can be potential issues such as collided page faults. Collided page faults means a page is requested while it is being fetched. These types of issues are resolved within the system under Memory Manager. [2]
+
+\subsection{FreeBSD}
+In FreeBSD, each process has its own private address space, just like the other operating systems. The address space is divided into three segments: text, data, and stack. The text segment is read-only and contains machine instructions of a program. Both data and stack are readable and writable. Data segment contains initialized data, while stack holds application’s run-time stack. [3]
+
+In terms of virtual memory system, FreeBSD uses Mach 2.0 VM system. The virtual memory system provides paging system like the other systems. Paging systems provides functionalities to copy data from memory to disk when memory is scarce, as well as paging data from disk to memory when data is requested but does not reside on main memory. Another interface called mmap is specified. It allows unrelated processes to request a shared mapping of files into their own address spaces. [3] This means if a number of processes mapped a file into their address spaces, any changes to the file would be reflected across all of those address spaces mapped. As of 4.4BSD, the virtual memory system used is based on Mach 2.0 VM system, with updates from Mach 2.5 and Mach 3.0. The VM system is adopted due to its “efficient support for sharing, a clear separation of machine-independent and machine-dependent features, as well as multiprocessor supports.” [5]
+
+FreeBSD also uses memory allocators. The primary ones are the slab allocator, keg allocator, and the zone allocator. The slab refers to a portion of the memory that are the same size, with restriction that a slab must be a multiple of a page size. The keg allocator is one level higher than slab allocator; each keg encapsulates multiple slabs. The zone allocator is another level higher than the keg allocator; each zone contains a set of kegs. [3]
+
+\subsection{Linux}
+In Linux, virtual memory systems are similar to both Windows and FreeBSD, with some very similar components from both of them. All the operating systems use a paging system, so that virtual memory can be mapped into physical address in both main memory and disk. However, there are some differences on how the page table is setup to achieve the virtual memory system. First of all, the address of page table entry in Linux contains the following values: global directory, middle directory, page table, and offset, while in Windows, the address structures only contain the page number and offset. Another major difference is Linux uses page zones to differentiate pages. The first zone is called ZONE\_DMA, used for direct memory access. The second zone is called ZONE\_DMA32, used for direct memory access specifically for 32-bit device. The third zone is called ZONE\_NORMAL, which contains normal, regularly mapped pages. The forth zone is called ZONE\_HIGHMEM, which contains “high memory”, which are pages not permanently mapped into kernel’s address space. Lastly, Linux strictly uses purely demand paging, with no pre-paging, unlike Windows. This means Linux does not page the data unless it is being requested. [4]
+
+In terms of memory allocator, there are multiple memory allocator built-in within Linux. The primary ones are SLAB allocator, SLOB allocator, and SLUB allocator. SLAB allocator uses slab allocation, which pre-allocates memory chunks, or slabs, suitable to fit data object. SLOB allocator, on the other hand, uses a first-fit algorithm. This means it uses the first available space for memory. SLUB allocator, is the current default allocator, uses queuing for single slab page to increase optimization on decrease fragmentation. [4]
+
+\section{Conclusion}
+The operating systems are extremely well-engineered pieces of software that are designed to serve as the middle layer between application layer and hardware. Over the years of development, FreeBSD, Linux and Windows have a lot of similarities in terms of how it interacts with hardware, and the functionality it provides. However, they also have drastic differences in terms of how each functionality are implemented. Windows prefers a more centralized approach. For example, Windows Memory manager takes care of the entire memory management process. Due to the centralized design, each manager’s codes often exist in different components of the kernel. In contrast, Linux and FreeBSD takes a much more modular approach to implementing system level operations. The most evident example would be the way Linux/FreeBSD implements process creation. Linux also has some minor differences from FreeBSD, but for the most part, the two systems share a lot of similarities.
+
+In the end, it is important to learn all three operating systems, as they are all very popular and widely-used. After learning about operating systems, I understand more about how application interacts with the operating systems, and how operating systems interact with the underlying hardware. I’m sure this class will help me become a better coder in the future.
+
+
+\bibliographystyle{alpha}
+\begin{thebibliography}{10}
+\bibitem{1}
+A. I. Mark E. Russinovich, David A. Solomon, Windows Internals, Part 1, 6th ed. Microsoft Press, 2012.
+
+\bibitem{2}
+A. I. Mark E. Russinovich, David A. Solomon, Windows Internals, Part 2, 6th ed. Microsoft Press, 2012.
+
+\bibitem{3}
+R. N. W. Marshall Kirk McKusick, George V. Neville-Neil, The Design and Implementation of the FreeBSD Operating System, 2nd ed.
+Addison-Wesley Professional, 2014.
+
+\bibitem{4}
+R. Love, Linux Kernel Development, 3rd ed. Addison-Wesley Professional, 2010.
+
+\bibitem{5}
+Memory Management, FreeBSD. [Online]. https://www.freebsd.org/doc/en/books/design-44bsd/overview-memory-management.html [Accessed: 12-Jun-2018].
+
+
+\end{thebibliography}
+
+\end{document}
